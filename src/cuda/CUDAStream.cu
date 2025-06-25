@@ -5,9 +5,7 @@
 // For full license terms please see the LICENSE file distributed with this
 // source code
 #include "CUDAStream.h"
-#include <bit>
-#include <limits>
-#include <chrono>
+
 
 #define PAD_EVERY_X_ELEMENTS (16 * (8 / sizeof(T))) 
 #define CONFLICT_FREE_OFFSET(n) ((n) / PAD_EVERY_X_ELEMENTS)   
