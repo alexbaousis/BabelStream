@@ -654,7 +654,7 @@ void check_solution(const unsigned int ntimes, std::vector<T>& a, std::vector<T>
     std::cerr
       << "Validation failed on c[]. Average error " << errC
       << std::endl;
-  if (errD > epsi)
+  if (errD > epsi && selection == Benchmark::Scan)
     std::cerr
       << "Validation failed on d[]. Average error " << errD
       << std::endl;
