@@ -23,6 +23,7 @@ class CUDAStream : public Stream<T>
   protected:
     // Size of arrays
     int array_size;
+    int scan_array_size;
 
     // Host array for partial sums for dot kernel
     T *sums;
@@ -31,6 +32,7 @@ class CUDAStream : public Stream<T>
     T *d_a;
     T *d_b;
     T *d_c;
+    T *d_d;
     T *d_sum;
 
     // Number of blocks for dot kernel
@@ -47,8 +49,9 @@ class CUDAStream : public Stream<T>
     virtual void triad() override;
     virtual void nstream() override;
     virtual T dot() override;
+    virtual void scan();
 
     virtual void init_arrays(T initA, T initB, T initC) override;
-    virtual void read_arrays(std::vector<T>& a, std::vector<T>& b, std::vector<T>& c) override;
+    virtual void read_arrays(std::vector<T>& a, std::vector<T>& b, std::vector<T>& c, std::vector<T>& d) override;
 
 };

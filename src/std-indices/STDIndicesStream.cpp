@@ -8,12 +8,13 @@
 
 #ifndef ALIGNMENT
 #define ALIGNMENT (2*1024*1024) // 2MB
+#define TBSIZE (1024);
 #endif
 
 template <class T>
 STDIndicesStream<T>::STDIndicesStream(const int ARRAY_SIZE, int device)
 noexcept : array_size{ARRAY_SIZE}, range(0, array_size),
-  a(alloc_raw<T>(ARRAY_SIZE)), b(alloc_raw<T>(ARRAY_SIZE)), c(alloc_raw<T>(ARRAY_SIZE))
+  a(alloc_raw<T>(ARRAY_SIZE)), b(alloc_raw<T>(ARRAY_SIZE)), c(alloc_raw<T>(ARRAY_SIZE)), d(alloc_raw<T>(ARRAY_SIZE))
 {
     std::cout << "Backing storage typeid: " << typeid(a).name() << std::endl;
 #ifdef USE_ONEDPL
@@ -36,6 +37,7 @@ STDIndicesStream<T>::~STDIndicesStream() {
   dealloc_raw(a);
   dealloc_raw(b);
   dealloc_raw(c);
+  dealloc_raw(d);
 }
 
 template <class T>
@@ -44,14 +46,17 @@ void STDIndicesStream<T>::init_arrays(T initA, T initB, T initC)
   std::fill(exe_policy, a, a + array_size, initA);
   std::fill(exe_policy, b, b + array_size, initB);
   std::fill(exe_policy, c, c + array_size, initC);
+  std::fill(exe_policy, d, d + array_size, initC);
 }
 
+
 template <class T>
-void STDIndicesStream<T>::read_arrays(std::vector<T>& h_a, std::vector<T>& h_b, std::vector<T>& h_c)
+void STDIndicesStream<T>::read_arrays(std::vector<T>& h_a, std::vector<T>& h_b, std::vector<T>& h_c, std::vector<T>& h_d)
 {
   std::copy(a, a + array_size, h_a.begin());
   std::copy(b, b + array_size, h_b.begin());
   std::copy(c, c + array_size, h_c.begin());
+  std::copy(c, d + array_size, h_d.begin());
 }
 
 template <class T>
@@ -107,6 +112,28 @@ T STDIndicesStream<T>::dot()
   // sum = 0; sum += a[i]*b[i]; return sum;
   return std::transform_reduce(exe_policy, a, a + array_size, b, T{});
 }
+
+template <class T>
+void STDIndicesStream<T>::scan()
+{
+  // std::inclusive_scan(
+  //   exe_policy,                          // Parallel execution policy (e.g., std::execution::par_unseq)
+  //   d.begin(), d + array_size,         // Input: index range
+  //   d,                                  // Output: result array
+  //   T{},                               // Initial value (identity for addition)
+  //   [a = this->a, b = this->b](T acc, int i) {
+  //     return acc + a[i] + b[i];         // Binary op: combine accumulated value and a[i] + b[i]
+  //   }
+  // );
+
+  
+  //  c[i] = a[i] + b[i];
+  // std::transform(exe_policy, range.begin(), range.end(), c, [a = this->a, b = this->b](int i) {
+  //   return a[i] + b[i];
+  // });
+
+}
+
 
 void listDevices(void)
 {

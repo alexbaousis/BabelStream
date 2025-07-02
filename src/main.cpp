@@ -63,7 +63,7 @@ bool mibibytes = false;
 std::string csv_separator = ",";
 
 template <typename T>
-void check_solution(const unsigned int ntimes, std::vector<T>& a, std::vector<T>& b, std::vector<T>& c, T& sum);
+void check_solution(const unsigned int ntimes, std::vector<T>& a, std::vector<T>& b, std::vector<T>& c, std::vector<T>& d, T& sum);
 
 template <typename T>
 void run();
@@ -72,7 +72,8 @@ void run();
 // - All 5 kernels (Copy, Add, Mul, Triad, Dot).
 // - Triad only.
 // - Nstream only.
-enum class Benchmark {All, Triad, Nstream};
+// - Scan
+enum class Benchmark {All, Triad, Nstream, Scan};
 
 // Selected run options.
 Benchmark selection = Benchmark::All;
@@ -190,6 +191,31 @@ std::vector<std::vector<double>> run_nstream(Stream<T> *stream)
     t2 = std::chrono::high_resolution_clock::now();
     timings[0].push_back(std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count());
   }
+  
+
+  return timings;
+
+}
+
+// Run the Scan kernel
+template <typename T>
+std::vector<std::vector<double>> run_scan(Stream<T> *stream)
+{
+  std::vector<std::vector<double>> timings(1);
+
+  // Declare timers
+  std::chrono::high_resolution_clock::time_point t1, t2;
+
+ // Run Scan in loop
+  for (int k = 0; k < num_times; k++) {
+    stream->init_arrays(startA, startB, startC); // Not being timed
+
+    t1 = std::chrono::high_resolution_clock::now();
+    stream->scan();
+    t2 = std::chrono::high_resolution_clock::now();
+    double elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1).count();
+    timings[0].push_back(elapsed);
+  }
 
   return timings;
 
@@ -201,18 +227,27 @@ std::vector<std::vector<double>> run_nstream(Stream<T> *stream)
 template <typename T>
 void run()
 {
+
+  int scan_array_size = (int)(ARRAY_SIZE * (1.0f - powf(1.0f / (1024*2), ceilf(logf(ARRAY_SIZE) / logf((float)(1024*2))))) / (1.0f - 1.0f / (1024*2)));   
+
   std::streamsize ss = std::cout.precision();
 
   if (!output_as_csv)
   {
     if (selection == Benchmark::All)
+    {
       std::cout << "Running kernels " << num_times << " times" << std::endl;
+    }
     else if (selection == Benchmark::Triad)
     {
       std::cout << "Running triad " << num_times << " times" << std::endl;
       std::cout << "Number of elements: " << ARRAY_SIZE << std::endl;
     }
-
+    else if (selection == Benchmark::Scan)
+    {
+      std::cout << "Running Scan " << num_times << " times" << std::endl;
+      std::cout << "Number of elements: " << ARRAY_SIZE << std::endl;
+    }
 
     if (sizeof(T) == sizeof(float))
       std::cout << "Precision: float" << std::endl;
@@ -222,6 +257,27 @@ void run()
 
     if (mibibytes)
     {
+
+      if (selection == Benchmark::Scan)
+      {
+
+        // MiB = 2^20
+        std::cout << std::setprecision(1) << std::fixed
+                  << "Array size: " << scan_array_size*sizeof(T)*std::pow(2.0, -20.0) << " MiB"
+                  << " (=" << scan_array_size*sizeof(T)*std::pow(2.0, -30.0) << " GiB)" << std::endl;
+        std::cout << "Total size: " << (scan_array_size + ARRAY_SIZE*3)*sizeof(T)*std::pow(2.0, -20.0) << " MiB"
+                  << " (=" << scan_array_size*sizeof(T)*std::pow(2.0, -30.0) << " GiB)" << std::endl;
+    
+      } else 
+      {
+        // MiB = 2^20
+        std::cout << std::setprecision(1) << std::fixed
+                  << "Array size: " << ARRAY_SIZE*sizeof(T)*std::pow(2.0, -20.0) << " MiB"
+                  << " (=" << ARRAY_SIZE*sizeof(T)*std::pow(2.0, -30.0) << " GiB)" << std::endl;
+        std::cout << "Total size: " << 3.0*ARRAY_SIZE*sizeof(T)*std::pow(2.0, -20.0) << " MiB"
+                  << " (=" << 3.0*ARRAY_SIZE*sizeof(T)*std::pow(2.0, -30.0) << " GiB)" << std::endl;
+      
+      }
       // MiB = 2^20
       std::cout << std::setprecision(1) << std::fixed
                 << "Array size: " << ARRAY_SIZE*sizeof(T)*std::pow(2.0, -20.0) << " MiB"
@@ -231,13 +287,26 @@ void run()
     }
     else
     {
-      // MB = 10^6
-      std::cout << std::setprecision(1) << std::fixed
-                << "Array size: " << ARRAY_SIZE*sizeof(T)*1.0E-6 << " MB"
-                << " (=" << ARRAY_SIZE*sizeof(T)*1.0E-9 << " GB)" << std::endl;
-      std::cout << "Total size: " << 3.0*ARRAY_SIZE*sizeof(T)*1.0E-6 << " MB"
-                << " (=" << 3.0*ARRAY_SIZE*sizeof(T)*1.0E-9 << " GB)" << std::endl;
-    }
+      if (selection == Benchmark::Scan)
+      { 
+        // MB = 10^6
+        std::cout << std::setprecision(1) << std::fixed
+                  << "Array size: " << scan_array_size*sizeof(T)*1.0E-6 << " MB"
+                  << " (=" << scan_array_size*sizeof(T)*1.0E-9 << " GB)" << std::endl;
+        std::cout << "Total size: " << (scan_array_size + ARRAY_SIZE*3)*sizeof(T)*1.0E-6 << " MB"
+                  << " (=" << (scan_array_size + ARRAY_SIZE*3)*sizeof(T)*1.0E-9 << " GB)" << std::endl;
+      
+      } else 
+      {
+         // MB = 10^6
+        std::cout << std::setprecision(1) << std::fixed
+                  << "Array size: " << ARRAY_SIZE*sizeof(T)*1.0E-6 << " MB"
+                  << " (=" << ARRAY_SIZE*sizeof(T)*1.0E-9 << " GB)" << std::endl;
+        std::cout << "Total size: " << 3.0*ARRAY_SIZE*sizeof(T)*1.0E-6 << " MB"
+                  << " (=" << 3.0*ARRAY_SIZE*sizeof(T)*1.0E-9 << " GB)" << std::endl;
+      }
+       
+      }
     std::cout.precision(ss);
 
   }
@@ -326,6 +395,9 @@ void run()
     case Benchmark::Nstream:
       timings = run_nstream<T>(stream);
       break;
+    case Benchmark::Scan:
+      timings = run_scan<T>(stream);
+      break;
   };
 
   // Check solutions
@@ -333,16 +405,18 @@ void run()
   std::vector<T> a(ARRAY_SIZE);
   std::vector<T> b(ARRAY_SIZE);
   std::vector<T> c(ARRAY_SIZE);
+  std::vector<T> d(scan_array_size);
+
 
 
   auto read1 = std::chrono::high_resolution_clock::now();
-  stream->read_arrays(a, b, c);
+  stream->read_arrays(a, b, c, d);
   auto read2 = std::chrono::high_resolution_clock::now();
 
   auto initElapsedS = std::chrono::duration_cast<std::chrono::duration<double>>(read2 - read1).count();
   auto readElapsedS = std::chrono::duration_cast<std::chrono::duration<double>>(init2 - init1).count();
-  auto initBWps = ((mibibytes ? std::pow(2.0, -20.0) : 1.0E-6) * (3 * sizeof(T) * ARRAY_SIZE)) / initElapsedS;
-  auto readBWps = ((mibibytes ? std::pow(2.0, -20.0) : 1.0E-6) * (3 * sizeof(T) * ARRAY_SIZE)) / readElapsedS;
+  auto initBWps = ((mibibytes ? std::pow(2.0, -20.0) : 1.0E-6) * ((3 * ARRAY_SIZE) + (scan_array_size)) * sizeof(T)) / initElapsedS;
+  auto readBWps = ((mibibytes ? std::pow(2.0, -20.0) : 1.0E-6) * ((3 * ARRAY_SIZE) + (scan_array_size)) * sizeof(T)) / readElapsedS;
 
   if (output_as_csv)
   {
@@ -365,7 +439,7 @@ void run()
       << readBWps << csv_separator
       << readElapsedS << std::endl;
   }
-  else
+  else    
   {
     std::cout << "Init: "
       << std::setw(7)
@@ -383,7 +457,7 @@ void run()
       << ")" << std::endl;
   }
 
-  check_solution<T>(num_times, a, b, c, sum);
+  check_solution<T>(num_times, a, b, c, d, sum);
 
   // Display timing results
   if (output_as_csv)
@@ -411,7 +485,7 @@ void run()
   }
 
 
-  if (selection == Benchmark::All || selection == Benchmark::Nstream)
+  if (selection == Benchmark::All || selection == Benchmark::Nstream || selection == Benchmark::Scan)
   {
 
     std::vector<std::string> labels;
@@ -430,6 +504,10 @@ void run()
     {
       labels = {"Nstream"};
       sizes = {4 * sizeof(T) * ARRAY_SIZE };
+    } else if (selection == Benchmark::Scan)
+    {
+      labels = {"Scan"};
+      sizes = {7 * (ARRAY_SIZE-1)  * sizeof(T)};
     }
 
     for (int i = 0; i < timings.size(); ++i)
@@ -472,6 +550,7 @@ void run()
     double total_bytes = 3 * sizeof(T) * ARRAY_SIZE * num_times;
     double bandwidth = ((mibibytes) ? std::pow(2.0, -30.0) : 1.0E-9) * (total_bytes / timings[0][0]);
 
+
     if (output_as_csv)
     {
       std::cout
@@ -510,7 +589,7 @@ void run()
 
 
 template <typename T>
-void check_solution(const unsigned int ntimes, std::vector<T>& a, std::vector<T>& b, std::vector<T>& c, T& sum)
+void check_solution(const unsigned int ntimes, std::vector<T>& a, std::vector<T>& b, std::vector<T>& c,  std::vector<T>& d, T& sum)
 {
   // Generate correct solution
   T goldA = startA;
@@ -519,6 +598,8 @@ void check_solution(const unsigned int ntimes, std::vector<T>& a, std::vector<T>
   T goldSum{};
 
   const T scalar = startScalar;
+
+  std::vector<T> goldDVector(ARRAY_SIZE);
 
   for (unsigned int i = 0; i < ntimes; i++)
   {
@@ -535,6 +616,12 @@ void check_solution(const unsigned int ntimes, std::vector<T>& a, std::vector<T>
     } else if (selection == Benchmark::Nstream)
     {
       goldA += goldB + scalar * goldC;
+    } else if(selection == Benchmark::Scan)
+    {
+      goldDVector[0] = 0;
+      for (int j = 1; j < ARRAY_SIZE; j++){
+        goldDVector[j] = goldDVector[j-1] + j;
+      }
     }
   }
 
@@ -548,6 +635,9 @@ void check_solution(const unsigned int ntimes, std::vector<T>& a, std::vector<T>
   errB /= b.size();
   long double errC = std::accumulate(c.begin(), c.end(), T{}, [&](double sum, const T val){ return sum + std::fabs(val - goldC); });
   errC /= c.size();
+  long double errD = 0.0f;
+  for (int j = 1; j < ARRAY_SIZE; j++){ errD += std::fabs(d[j] - goldDVector[j]);}
+  errD /= ARRAY_SIZE;
   long double errSum = std::fabs((sum - goldSum)/goldSum);
 
   long double epsi = std::numeric_limits<T>::epsilon() * 100.0;
@@ -563,6 +653,10 @@ void check_solution(const unsigned int ntimes, std::vector<T>& a, std::vector<T>
   if (errC > epsi)
     std::cerr
       << "Validation failed on c[]. Average error " << errC
+      << std::endl;
+  if (errD > epsi && selection == Benchmark::Scan)
+    std::cerr
+      << "Validation failed on d[]. Average error " << errD
       << std::endl;
   // Check sum to 8 decimal places
   if (selection == Benchmark::All && errSum > 1.0E-8)
@@ -639,6 +733,10 @@ void parseArguments(int argc, char *argv[])
     else if (!std::string("--nstream-only").compare(argv[i]))
     {
       selection = Benchmark::Nstream;
+    } 
+    else if (!std::string("--scan-only").compare(argv[i]))
+    {
+      selection = Benchmark::Scan;
     }
     else if (!std::string("--csv").compare(argv[i]))
     {
@@ -662,6 +760,7 @@ void parseArguments(int argc, char *argv[])
       std::cout << "      --float              Use floats (rather than doubles)" << std::endl;
       std::cout << "      --triad-only         Only run triad" << std::endl;
       std::cout << "      --nstream-only       Only run nstream" << std::endl;
+      std::cout << "      --scan-only          Only run scan" << std::endl;
       std::cout << "      --csv                Output as csv table" << std::endl;
       std::cout << "      --mibibytes          Use MiB=2^20 for bandwidth calculation (default MB=10^6)" << std::endl;
       std::cout << std::endl;

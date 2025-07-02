@@ -40,15 +40,20 @@ class OCLStream : public Stream<T>
     cl::Buffer d_a;
     cl::Buffer d_b;
     cl::Buffer d_c;
+    cl::Buffer d_d;
     cl::Buffer d_sum;
 
-    cl::KernelFunctor<cl::Buffer, cl::Buffer, cl::Buffer, T, T, T> *init_kernel;
+    cl::KernelFunctor<cl::Buffer, cl::Buffer, cl::Buffer, cl::Buffer, T, T, T> *init_kernel;
     cl::KernelFunctor<cl::Buffer, cl::Buffer> *copy_kernel;
     cl::KernelFunctor<cl::Buffer, cl::Buffer> * mul_kernel;
     cl::KernelFunctor<cl::Buffer, cl::Buffer, cl::Buffer> *add_kernel;
     cl::KernelFunctor<cl::Buffer, cl::Buffer, cl::Buffer> *triad_kernel;
     cl::KernelFunctor<cl::Buffer, cl::Buffer, cl::Buffer> *nstream_kernel;
     cl::KernelFunctor<cl::Buffer, cl::Buffer, cl::Buffer, cl::LocalSpaceArg, cl_int> *dot_kernel;
+    cl::KernelFunctor<cl::Buffer, int, cl::Buffer, cl::LocalSpaceArg> *scan_kernel;
+    cl::KernelFunctor<cl::Buffer, cl::Buffer, int> *addBlockSums;
+
+
 
     // NDRange configuration for the dot kernel
     size_t dot_num_groups;
@@ -65,9 +70,13 @@ class OCLStream : public Stream<T>
     virtual void triad() override;
     virtual void nstream() override;
     virtual T dot() override;
+    virtual void scan() override;
+    virtual void recursiveScan(cl::Buffer& input_buffer, int current_length, int original_length);
+
+
 
     virtual void init_arrays(T initA, T initB, T initC) override;
-    virtual void read_arrays(std::vector<T>& a, std::vector<T>& b, std::vector<T>& c) override;
+    virtual void read_arrays(std::vector<T>& a, std::vector<T>& b, std::vector<T>& c, std::vector<T>& d) override;
 
 };
 

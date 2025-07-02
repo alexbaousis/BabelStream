@@ -12,6 +12,8 @@
 #include "Stream.h"
 
 #define IMPLEMENTATION_STRING "STD (index-oriented)"
+#define TBSIZE 1024
+
 
 // A lightweight counting iterator which will be used by the STL algorithms
 // NB: C++ <= 17 doesn't have this built-in, and it's only added later in ranges-v3 (C++2a) which this
@@ -77,7 +79,7 @@ class STDIndicesStream : public Stream<T>
     ranged<int> range;
 
     // Device side pointers
-    T *a, *b, *c;
+    T *a, *b, *c, *d;
 
   public:
     STDIndicesStream(const int, int) noexcept;
@@ -89,8 +91,9 @@ class STDIndicesStream : public Stream<T>
     virtual void triad() override;
     virtual void nstream() override;
     virtual T dot() override;
+    virtual void scan() override;
 
     virtual void init_arrays(T initA, T initB, T initC) override;
-    virtual void read_arrays(std::vector<T>& a, std::vector<T>& b, std::vector<T>& c) override;
+    virtual void read_arrays(std::vector<T>& a, std::vector<T>& b, std::vector<T>& c, std::vector<T>& d) override;
 };
 
