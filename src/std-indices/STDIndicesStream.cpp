@@ -8,12 +8,24 @@
 
 #ifndef ALIGNMENT
 #define ALIGNMENT (2*1024*1024) // 2MB
+#define TBSIZE (1024);
 #endif
 
 template <class T>
 STDIndicesStream<T>::STDIndicesStream(const int ARRAY_SIZE, int device)
-noexcept : array_size{ARRAY_SIZE}, range(0, array_size),
-  a(alloc_raw<T>(ARRAY_SIZE)), b(alloc_raw<T>(ARRAY_SIZE)), c(alloc_raw<T>(ARRAY_SIZE))
+noexcept :
+  array_size{ARRAY_SIZE},
+  scan_array_size{
+    static_cast<int>(
+      ARRAY_SIZE * (1.0f - powf(1.0f / (1024 * 2), ceilf(logf(ARRAY_SIZE) / logf(static_cast<float>(1024 * 2)))))
+      / (1.0f - 1.0f / (1024 * 2))
+    )
+  },
+  range(0, array_size),
+  a(alloc_raw<T>(ARRAY_SIZE)),
+  b(alloc_raw<T>(ARRAY_SIZE)),
+  c(alloc_raw<T>(ARRAY_SIZE)),
+  d(alloc_raw<T>(scan_array_size))
 {
     std::cout << "Backing storage typeid: " << typeid(a).name() << std::endl;
 #ifdef USE_ONEDPL
@@ -36,6 +48,7 @@ STDIndicesStream<T>::~STDIndicesStream() {
   dealloc_raw(a);
   dealloc_raw(b);
   dealloc_raw(c);
+  dealloc_raw(d);
 }
 
 template <class T>
@@ -44,14 +57,21 @@ void STDIndicesStream<T>::init_arrays(T initA, T initB, T initC)
   std::fill(exe_policy, a, a + array_size, initA);
   std::fill(exe_policy, b, b + array_size, initB);
   std::fill(exe_policy, c, c + array_size, initC);
+  std::iota(d, d + array_size, T(0));
 }
 
+
 template <class T>
-void STDIndicesStream<T>::read_arrays(std::vector<T>& h_a, std::vector<T>& h_b, std::vector<T>& h_c)
+void STDIndicesStream<T>::read_arrays(std::vector<T>& h_a, std::vector<T>& h_b, std::vector<T>& h_c, std::vector<T>& h_d)
 {
+
+  int scan_array_size = (int)(array_size * (1.0f - powf(1.0f / (1024*2), ceilf(logf(array_size) / logf((float)(1024*2))))) / (1.0f - 1.0f / (1024*2)));   
+
+  
   std::copy(a, a + array_size, h_a.begin());
   std::copy(b, b + array_size, h_b.begin());
   std::copy(c, c + array_size, h_c.begin());
+  std::copy(d, d + scan_array_size, h_d.begin());
 }
 
 template <class T>
@@ -107,6 +127,16 @@ T STDIndicesStream<T>::dot()
   // sum = 0; sum += a[i]*b[i]; return sum;
   return std::transform_reduce(exe_policy, a, a + array_size, b, T{});
 }
+
+template <class T>
+void STDIndicesStream<T>::scan()
+{
+  std::inclusive_scan(
+    exe_policy, d, d + array_size, d                         
+  );  
+
+}
+
 
 void listDevices(void)
 {

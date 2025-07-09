@@ -21,6 +21,8 @@ OMPStream<T>::OMPStream(const int ARRAY_SIZE, int device)
   this->a = (T*)aligned_alloc(ALIGNMENT, sizeof(T)*array_size);
   this->b = (T*)aligned_alloc(ALIGNMENT, sizeof(T)*array_size);
   this->c = (T*)aligned_alloc(ALIGNMENT, sizeof(T)*array_size);
+  this->d = (T*)aligned_alloc(ALIGNMENT, sizeof(T)*array_size);
+
 
 #ifdef OMP_TARGET_GPU
   omp_set_default_device(device);
@@ -43,12 +45,14 @@ OMPStream<T>::~OMPStream()
   T *a = this->a;
   T *b = this->b;
   T *c = this->c;
-  #pragma omp target exit data map(release: a[0:array_size], b[0:array_size], c[0:array_size])
+  T *d = this->d;
+  #pragma omp target exit data map(release: a[0:array_size], b[0:array_size], c[0:array_size], d[0:array_size])
   {}
 #endif
   free(a);
   free(b);
   free(c);
+  free(d);
 }
 
 template <class T>
@@ -59,6 +63,7 @@ void OMPStream<T>::init_arrays(T initA, T initB, T initC)
   T *a = this->a;
   T *b = this->b;
   T *c = this->c;
+  T *d = this->d;
   #pragma omp target teams distribute parallel for simd
 #else
   #pragma omp parallel for
@@ -68,6 +73,7 @@ void OMPStream<T>::init_arrays(T initA, T initB, T initC)
     a[i] = initA;
     b[i] = initB;
     c[i] = initC;
+    d[i] = i;
   }
   #if defined(OMP_TARGET_GPU) && defined(_CRAYC)
   // If using the Cray compiler, the kernels do not block, so this update forces
@@ -77,14 +83,15 @@ void OMPStream<T>::init_arrays(T initA, T initB, T initC)
 }
 
 template <class T>
-void OMPStream<T>::read_arrays(std::vector<T>& h_a, std::vector<T>& h_b, std::vector<T>& h_c)
+void OMPStream<T>::read_arrays(std::vector<T>& h_a, std::vector<T>& h_b, std::vector<T>& h_c, std::vector<T>& h_d)
 {
 
 #ifdef OMP_TARGET_GPU
   T *a = this->a;
   T *b = this->b;
   T *c = this->c;
-  #pragma omp target update from(a[0:array_size], b[0:array_size], c[0:array_size])
+  T *d = this->d;
+  #pragma omp target update from(a[0:array_size], b[0:array_size], c[0:array_size], d[0:array_size])
   {}
 #endif
 
@@ -94,6 +101,7 @@ void OMPStream<T>::read_arrays(std::vector<T>& h_a, std::vector<T>& h_b, std::ve
     h_a[i] = a[i];
     h_b[i] = b[i];
     h_c[i] = c[i];
+    h_d[i] = d[i];
   }
 
 }
@@ -237,6 +245,35 @@ T OMPStream<T>::dot()
 
   return sum;
 }
+
+template <class T>
+void OMPStream<T>::scan()
+{
+    int array_size = this->array_size;
+    T *d = this->d;
+
+#ifdef OMP_TARGET_GPU
+    // NOTE: OpenMP offload devices do not yet support 'reduction(inscan:...)' in all compilers
+    // This example assumes a compiler with support (e.g. NVIDIA HPC compiler)
+    T scan_val = 0;
+
+    std::cout << "Running on GPU!" << std::endl;
+
+    #pragma omp simd reduction(inscan, +:scan_val)
+    for (int i = 0; i < array_size; i++) {
+        scan_val += d[i];
+        #pragma omp scan inclusive(scan_val)
+        d[i] = scan_val;
+    }
+
+#else
+    // Serial fallback
+    for (int i = 1; i < array_size; i++) {
+        d[i] = d[i - 1] + d[i];
+    }
+#endif
+}
+
 
 
 

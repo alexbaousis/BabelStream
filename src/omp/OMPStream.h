@@ -15,6 +15,8 @@
 #include <omp.h>
 
 #define IMPLEMENTATION_STRING "OpenMP"
+#define TBSIZE 1024
+
 
 template <class T>
 class OMPStream : public Stream<T>
@@ -27,6 +29,7 @@ class OMPStream : public Stream<T>
     T *a;
     T *b;
     T *c;
+    T *d;
 
   public:
     OMPStream(const int, int);
@@ -37,10 +40,11 @@ class OMPStream : public Stream<T>
     virtual void mul() override;
     virtual void triad() override;
     virtual void nstream() override;
+    virtual void scan() override;
     virtual T dot() override;
 
     virtual void init_arrays(T initA, T initB, T initC) override;
-    virtual void read_arrays(std::vector<T>& a, std::vector<T>& b, std::vector<T>& c) override;
+    virtual void read_arrays(std::vector<T>& a, std::vector<T>& b, std::vector<T>& c, std::vector<T>& d) override;
 
 
 
