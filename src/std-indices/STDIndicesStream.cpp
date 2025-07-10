@@ -131,11 +131,9 @@ T STDIndicesStream<T>::dot()
 template <class T>
 void STDIndicesStream<T>::scan()
 {
-  std::inclusive_scan(
-    exe_policy, d, d + array_size, d                         
-  );  
-
+  std::transform_inclusive_scan(exe_policy, range.begin(), range.end(), d, std::plus<T>(), [d = this->d](int i) {return d[i];});
 }
+
 
 
 void listDevices(void)
