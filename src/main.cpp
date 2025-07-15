@@ -507,7 +507,7 @@ void run()
     } else if (selection == Benchmark::Scan)
     {
       labels = {"Scan"};
-      sizes = {7 * (ARRAY_SIZE-1)  * sizeof(T)};
+      sizes = {4 * (ARRAY_SIZE-1)  * sizeof(T)};
     }
 
     for (int i = 0; i < timings.size(); ++i)
